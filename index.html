@@ -1,0 +1,1204 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FilaForge — 颗粒制线配方工作站</title>
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0c0d0f;--surface:#15171a;--surface-2:#1c1f23;--surface-3:#262a2f;
+  --border:rgba(255,255,255,0.06);--border-strong:rgba(255,255,255,0.12);
+  --text:#f0f1f3;--text-2:#8b8f96;--text-3:#555a62;
+  --accent:#00d4aa;--accent-glow:rgba(0,212,170,0.15);
+  --blue:#3b82f6;--purple:#a855f7;--orange:#f59e0b;
+  --warn:#f59e0b;--danger:#ef4444;--success:#22c55e;
+  --radius:16px;--radius-sm:10px;--radius-xs:6px;
+  --transition:.25s cubic-bezier(.4,0,.2,1);
+  --shadow:0 4px 24px rgba(0,0,0,.4);--shadow-lg:0 12px 48px rgba(0,0,0,.5);
+}
+html,body{height:100%;overflow:hidden}
+body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+
+/* Layout */
+.app{display:flex;flex-direction:column;height:100vh}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:0 28px;height:56px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0}
+.topbar-brand{display:flex;align-items:center;gap:10px}
+.topbar-brand .dot{width:10px;height:10px;border-radius:50%;background:var(--accent);box-shadow:0 0 12px var(--accent-glow)}
+.topbar-brand span{font-size:16px;font-weight:600;letter-spacing:.3px}
+.topbar-meta{display:flex;align-items:center;gap:16px}
+.topbar-status{font-size:12px;color:var(--text-2);display:flex;align-items:center;gap:6px}
+.topbar-status .pulse{width:7px;height:7px;border-radius:50%;background:var(--accent);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+.body-area{display:flex;flex:1;overflow:hidden}
+
+/* Sidebar */
+.sidebar{width:360px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+.sidebar-tabs{display:flex;border-bottom:1px solid var(--border);flex-shrink:0}
+.sidebar-tab{flex:1;padding:14px 0;text-align:center;font-size:13px;font-weight:500;color:var(--text-3);cursor:pointer;transition:var(--transition);border-bottom:2px solid transparent}
+.sidebar-tab:hover{color:var(--text-2)}
+.sidebar-tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.sidebar-content{flex:1;overflow-y:auto}
+
+.tab-panel{display:none;padding:20px 24px}
+.tab-panel.active{display:block}
+
+.sidebar-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--text-3);margin-bottom:14px}
+
+/* Material blend */
+.material-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:20px}
+.material-card{background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 10px;cursor:pointer;transition:var(--transition);text-align:center;position:relative;overflow:hidden}
+.material-card:hover{background:var(--surface-3);border-color:var(--border-strong)}
+.material-card.active{background:var(--accent-glow);border-color:var(--accent)}
+.material-card.active::after{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--accent)}
+.material-card .mat-name{font-size:13px;font-weight:600}
+.material-card .mat-temp{font-size:10px;color:var(--text-3);margin-top:2px}
+
+/* Blend slider */
+.blend-section{margin-top:16px}
+.blend-row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.blend-label{font-size:12px;color:var(--text-2);min-width:60px}
+.blend-bar{flex:1;height:8px;background:var(--surface-3);border-radius:4px;overflow:hidden;display:flex}
+.blend-fill-a{background:var(--accent);transition:width .3s}
+.blend-fill-b{background:var(--blue);transition:width .3s}
+.blend-pct{font-size:12px;font-weight:600;min-width:36px;text-align:right}
+.blend-slider{width:100%;-webkit-appearance:none;appearance:none;height:4px;background:var(--surface-3);border-radius:2px;outline:none;cursor:pointer;margin-top:4px}
+.blend-slider::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:var(--accent);cursor:pointer;border:2px solid var(--bg)}
+.blend-slider::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:var(--accent);cursor:pointer;border:2px solid var(--bg)}
+
+/* Color section */
+.color-method-row{display:flex;gap:6px;margin-bottom:16px}
+.color-method-btn{flex:1;padding:10px 6px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-xs);color:var(--text-2);font-size:12px;font-weight:500;cursor:pointer;transition:var(--transition);text-align:center}
+.color-method-btn:hover{background:var(--surface-3)}
+.color-method-btn.active{background:var(--accent-glow);border-color:var(--accent);color:var(--accent)}
+
+.color-grid{display:grid;grid-template-columns:repeat(8,1fr);gap:5px;margin-bottom:14px}
+.color-dot{aspect-ratio:1;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:var(--transition)}
+.color-dot:hover{transform:scale(1.15)}
+.color-dot.active{border-color:#fff;box-shadow:0 0 0 2px var(--accent),0 0 12px rgba(0,0,0,.3)}
+
+.color-custom-row{display:flex;gap:8px;align-items:center;margin-bottom:14px}
+.color-custom-row input[type=color]{width:40px;height:36px;border:none;border-radius:var(--radius-xs);cursor:pointer;background:none}
+.color-custom-row input[type=color]::-webkit-color-swatch-wrapper{padding:0}
+.color-custom-row input[type=color]::-webkit-color-swatch{border:1px solid var(--border-strong);border-radius:var(--radius-xs)}
+.color-hex-input{flex:1;background:var(--surface-2);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-xs);font-family:'SF Mono','Fira Code',monospace;font-size:13px;outline:none}
+.color-hex-input:focus{border-color:var(--accent)}
+
+.dosage-row{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.dosage-label{font-size:12px;color:var(--text-2);min-width:50px}
+.dosage-slider{flex:1;-webkit-appearance:none;appearance:none;height:4px;background:var(--surface-3);border-radius:2px;outline:none;cursor:pointer}
+.dosage-slider::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:var(--orange);cursor:pointer;border:2px solid var(--bg)}
+.dosage-slider::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:var(--orange);cursor:pointer;border:2px solid var(--bg)}
+.dosage-val{font-size:13px;font-weight:600;min-width:42px;text-align:right}
+
+.recent-row{display:flex;gap:5px;flex-wrap:wrap}
+.recent-dot{width:24px;height:24px;border-radius:50%;cursor:pointer;border:1px solid var(--border);transition:var(--transition)}
+.recent-dot:hover{transform:scale(1.12)}
+.recent-empty{font-size:12px;color:var(--text-3)}
+
+/* Additives */
+.additive-list{display:flex;flex-direction:column;gap:10px}
+.additive-item{background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;transition:var(--transition)}
+.additive-item.active{border-color:var(--border-strong);background:var(--surface-3)}
+.additive-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.additive-info{display:flex;align-items:center;gap:10px}
+.additive-icon{font-size:18px}
+.additive-name{font-size:13px;font-weight:600}
+.additive-desc{font-size:11px;color:var(--text-3)}
+.additive-toggle{width:40px;height:22px;background:var(--surface-3);border-radius:11px;cursor:pointer;position:relative;transition:var(--transition);flex-shrink:0}
+.additive-toggle.on{background:var(--accent)}
+.additive-toggle::after{content:'';position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;transition:var(--transition)}
+.additive-toggle.on::after{transform:translateX(18px)}
+.additive-control{display:none;margin-top:10px}
+.additive-item.active .additive-control{display:block}
+.additive-pct-row{display:flex;align-items:center;gap:10px}
+.additive-pct-slider{flex:1;-webkit-appearance:none;appearance:none;height:4px;background:var(--surface-3);border-radius:2px;outline:none;cursor:pointer}
+.additive-pct-slider::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--purple);cursor:pointer;border:2px solid var(--bg)}
+.additive-pct-slider::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:var(--purple);cursor:pointer;border:2px solid var(--bg)}
+.additive-pct-val{font-size:12px;font-weight:600;min-width:36px;text-align:right}
+
+/* Pellet preview */
+.pellet-preview{display:flex;justify-content:center;padding:8px 0 4px}
+
+/* Main Area */
+.main-area{flex:1;display:flex;flex-direction:column;overflow:hidden}
+
+.recipe-bar{display:flex;align-items:center;justify-content:space-between;padding:16px 28px;border-bottom:1px solid var(--border);flex-shrink:0}
+.recipe-bar-left{display:flex;align-items:center;gap:12px}
+.recipe-bar-title{font-size:15px;font-weight:600}
+.recipe-bar-sub{font-size:12px;color:var(--text-2)}
+.recipe-bar-actions{display:flex;gap:8px;align-items:center}
+
+.select-styled{background:var(--surface-2);border:1px solid var(--border);color:var(--text);padding:9px 32px 9px 14px;border-radius:var(--radius-xs);font-size:13px;cursor:pointer;outline:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%238b8f96' stroke-width='1.5'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center}
+.select-styled option{background:var(--surface-2)}
+
+.btn{display:inline-flex;align-items:center;gap:6px;padding:9px 16px;border-radius:var(--radius-xs);font-size:13px;font-weight:500;cursor:pointer;border:1px solid var(--border-strong);background:var(--surface-2);color:var(--text);transition:var(--transition);white-space:nowrap}
+.btn:hover{background:var(--surface-3)}
+.btn-primary{background:var(--accent);border-color:var(--accent);color:#0c0d0f;font-weight:600}
+.btn-primary:hover{background:#00e6b8;box-shadow:0 0 20px var(--accent-glow)}
+.btn-icon{padding:9px 11px}
+.btn-danger:hover{background:rgba(239,68,68,.12);border-color:var(--danger);color:var(--danger)}
+
+/* Param Area */
+.param-area{flex:1;overflow-y:auto;padding:28px}
+.param-header{display:flex;align-items:baseline;gap:12px;margin-bottom:6px}
+.param-header h2{font-size:22px;font-weight:700}
+.material-badge{font-size:12px;font-weight:600;padding:4px 12px;border-radius:20px;background:var(--accent-glow);color:var(--accent)}
+.param-subheader{font-size:13px;color:var(--text-2);margin-bottom:24px}
+
+/* Formula composition bar */
+.formula-bar{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:16px 20px;margin-bottom:24px}
+.formula-bar-title{font-size:12px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px}
+.formula-composition{display:flex;gap:2px;height:24px;border-radius:6px;overflow:hidden;margin-bottom:10px}
+.formula-seg{display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;color:rgba(255,255,255,.9);transition:var(--transition);overflow:hidden;white-space:nowrap}
+.formula-legend{display:flex;flex-wrap:wrap;gap:12px}
+.formula-legend-item{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-2)}
+.formula-legend-dot{width:10px;height:10px;border-radius:3px}
+
+/* Big param cards */
+.param-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-bottom:32px}
+.param-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:28px 24px;position:relative;overflow:hidden;transition:var(--transition)}
+.param-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--accent);opacity:0;transition:var(--transition)}
+.param-card:hover{border-color:var(--border-strong)}
+.param-card:hover::before{opacity:1}
+.param-card.warn::before{background:var(--warn);opacity:1}
+.param-card-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
+.param-card-icon{width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;background:var(--surface-3)}
+.param-card-label{font-size:13px;font-weight:500;color:var(--text-2)}
+.param-card-warn{font-size:16px;opacity:0;transition:var(--transition)}
+.param-card.warn .param-card-warn{opacity:1}
+.param-value-row{display:flex;align-items:baseline;gap:6px;margin-bottom:20px}
+.param-value{font-size:52px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums;letter-spacing:-1px}
+.param-unit{font-size:18px;color:var(--text-3);font-weight:500}
+.param-slider{width:100%;-webkit-appearance:none;appearance:none;height:4px;background:var(--surface-3);border-radius:2px;outline:none;cursor:pointer}
+.param-slider::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:var(--accent);cursor:pointer;border:3px solid var(--bg);box-shadow:0 0 0 1px var(--accent),0 2px 8px rgba(0,0,0,.3);transition:var(--transition)}
+.param-slider::-webkit-slider-thumb:hover{transform:scale(1.2)}
+.param-slider::-moz-range-thumb{width:20px;height:20px;border-radius:50%;background:var(--accent);cursor:pointer;border:3px solid var(--bg)}
+.param-slider-marks{display:flex;justify-content:space-between;margin-top:8px}
+.param-slider-marks span{font-size:10px;color:var(--text-3)}
+.param-hint{margin-top:14px;font-size:12px;color:var(--text-3);display:flex;align-items:center;gap:6px}
+.param-hint.warn{color:var(--warn)}
+
+/* Recipe Library */
+.recipe-section{margin-top:8px}
+.recipe-section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.recipe-section-header h3{font-size:16px;font-weight:600}
+.recipe-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
+.recipe-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:16px;cursor:pointer;transition:var(--transition);position:relative}
+.recipe-card:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:var(--shadow)}
+.recipe-card-top{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.recipe-card-color{width:32px;height:32px;border-radius:8px;flex-shrink:0;border:1px solid var(--border-strong)}
+.recipe-card-name{font-size:14px;font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.recipe-card-tags{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px}
+.recipe-tag{font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px;background:var(--surface-3);color:var(--text-2)}
+.recipe-tag.additive{background:rgba(168,85,247,.12);color:var(--purple)}
+.recipe-tag.color{background:rgba(245,158,11,.12);color:var(--orange)}
+.recipe-card-params{display:flex;gap:12px;flex-wrap:wrap}
+.recipe-card-param{font-size:11px;color:var(--text-3)}
+.recipe-card-param b{color:var(--text-2);font-weight:600}
+.recipe-card-builtin{position:absolute;top:8px;right:8px;font-size:9px;color:var(--text-3)}
+
+/* Action bar */
+.action-bar{display:flex;align-items:center;justify-content:space-between;padding:14px 28px;background:var(--surface);border-top:1px solid var(--border);flex-shrink:0}
+.action-bar-info{font-size:12px;color:var(--text-3)}
+.action-bar-info b{color:var(--text-2)}
+.action-bar-buttons{display:flex;gap:10px}
+
+/* Modal */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;z-index:500}
+.modal-overlay.show{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--radius);padding:28px;width:420px;max-width:90%;box-shadow:var(--shadow-lg)}
+.modal h3{font-size:18px;font-weight:600;margin-bottom:6px}
+.modal p{font-size:13px;color:var(--text-2);margin-bottom:18px}
+.modal-input{width:100%;background:var(--surface-2);border:1px solid var(--border);color:var(--text);padding:12px 14px;border-radius:var(--radius-xs);font-size:14px;outline:none;margin-bottom:18px}
+.modal-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow)}
+.modal-actions{display:flex;justify-content:flex-end;gap:8px}
+.export-box{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-xs);padding:16px;font-family:'SF Mono','Fira Code',monospace;font-size:12px;color:var(--text-2);white-space:pre-wrap;word-break:break-all;max-height:320px;overflow-y:auto;margin-bottom:18px}
+
+/* Import area */
+.import-area{border:2px dashed var(--border-strong);border-radius:var(--radius-sm);padding:24px;text-align:center;cursor:pointer;transition:var(--transition);margin-bottom:16px}
+.import-area:hover{border-color:var(--accent);background:var(--accent-glow)}
+.import-area.dragover{border-color:var(--accent);background:var(--accent-glow)}
+.import-area p{margin:0;color:var(--text-2)}
+.import-area .import-icon{font-size:32px;margin-bottom:8px}
+
+/* Toast */
+.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%) translateY(40px);background:var(--surface-2);border:1px solid var(--border-strong);padding:12px 22px;border-radius:24px;font-size:13px;font-weight:500;z-index:999;opacity:0;transition:.3s ease;box-shadow:var(--shadow-lg);display:flex;align-items:center;gap:8px}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast.success{border-color:var(--accent)}
+.toast.success .toast-icon{color:var(--accent)}
+.toast.error{border-color:var(--danger)}
+.toast.error .toast-icon{color:var(--danger)}
+
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border-strong);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:var(--text-3)}
+
+@media(max-width:1100px){.sidebar{width:300px}.param-cards{grid-template-columns:1fr}.param-value{font-size:42px}}
+@media(max-width:768px){.body-area{flex-direction:column}.sidebar{width:100%;max-height:300px;border-right:none;border-bottom:1px solid var(--border)}}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- Topbar -->
+  <div class="topbar">
+    <div class="topbar-brand">
+      <div class="dot"></div>
+      <span>FilaForge</span>
+      <span style="font-size:12px;color:var(--text-3);margin-left:8px;">颗粒制线配方工作站</span>
+    </div>
+    <div class="topbar-status">
+      <div class="pulse"></div>
+      <span id="statusText">就绪</span>
+    </div>
+  </div>
+
+  <div class="body-area">
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <div class="sidebar-tabs">
+        <div class="sidebar-tab active" onclick="switchTab('granule')">颗粒</div>
+        <div class="sidebar-tab" onclick="switchTab('color')">染色</div>
+        <div class="sidebar-tab" onclick="switchTab('additive')">添加剂</div>
+        <div class="sidebar-tab" onclick="switchTab('preview')">预览</div>
+      </div>
+      <div class="sidebar-content">
+
+        <!-- Tab: Granule -->
+        <div class="tab-panel active" id="tab-granule">
+          <div class="sidebar-label">基础颗粒</div>
+          <div class="material-grid" id="materialGrid"></div>
+
+          <div class="sidebar-label" style="margin-top:20px;">混合颗粒 (可选)</div>
+          <div class="material-grid" id="blendGrid"></div>
+
+          <div class="blend-section" id="blendSection" style="display:none;">
+            <div class="sidebar-label">混合比例</div>
+            <div class="blend-row">
+              <span class="blend-label" id="blendLabelA">PLA</span>
+              <div class="blend-bar">
+                <div class="blend-fill-a" id="blendFillA" style="width:70%"></div>
+                <div class="blend-fill-b" id="blendFillB" style="width:30%"></div>
+              </div>
+              <span class="blend-pct" id="blendPctA">70%</span>
+            </div>
+            <input type="range" class="blend-slider" id="blendSlider" min="0" max="100" step="5" value="70" oninput="onBlendChange(this.value)">
+            <div style="display:flex;justify-content:space-between;margin-top:4px;">
+              <span style="font-size:10px;color:var(--text-3)" id="blendNameA">PLA 70%</span>
+              <span style="font-size:10px;color:var(--text-3)" id="blendNameB">PETG 30%</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab: Color -->
+        <div class="tab-panel" id="tab-color">
+          <div class="sidebar-label">染色方式</div>
+          <div class="color-method-row">
+            <div class="color-method-btn active" onclick="setColorMethod('none')">无</div>
+            <div class="color-method-btn" onclick="setColorMethod('powder')">色粉</div>
+            <div class="color-method-btn" onclick="setColorMethod('oil')">扩散油</div>
+          </div>
+
+          <div id="colorPickerArea" style="display:none;">
+            <div class="sidebar-label">颜色</div>
+            <div class="color-grid" id="colorGrid"></div>
+            <div class="color-custom-row">
+              <input type="color" id="customColor" value="#00d4aa">
+              <input type="text" class="color-hex-input" id="hexInput" value="#00D4AA" maxlength="7">
+            </div>
+            <div class="sidebar-label" style="margin-top:16px;">用量</div>
+            <div class="dosage-row">
+              <span class="dosage-label" id="dosageLabel">色粉</span>
+              <input type="range" class="dosage-slider" id="dosageSlider" min="0.1" max="5" step="0.1" value="1.0" oninput="onDosageChange(this.value)">
+              <span class="dosage-val" id="dosageVal">1.0%</span>
+            </div>
+          </div>
+
+          <div class="sidebar-label" style="margin-top:16px;">最近使用</div>
+          <div class="recent-row" id="recentColors">
+            <span class="recent-empty">暂无</span>
+          </div>
+        </div>
+
+        <!-- Tab: Additives -->
+        <div class="tab-panel" id="tab-additive">
+          <div class="sidebar-label">功能性添加剂</div>
+          <div class="additive-list" id="additiveList"></div>
+        </div>
+
+        <!-- Tab: Preview -->
+        <div class="tab-panel" id="tab-preview">
+          <div class="sidebar-label">配方预览</div>
+          <div class="pellet-preview" id="pelletPreview"></div>
+          <div id="previewFormula" style="margin-top:16px;"></div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Main Area -->
+    <div class="main-area">
+      <!-- Recipe Bar -->
+      <div class="recipe-bar">
+        <div class="recipe-bar-left">
+          <div>
+            <div class="recipe-bar-title">配方库</div>
+            <div class="recipe-bar-sub" id="recipeSubText">选择、保存或导入配方</div>
+          </div>
+        </div>
+        <div class="recipe-bar-actions">
+          <select class="select-styled" id="recipeSelect" style="width:200px;">
+            <option value="">— 选择配方 —</option>
+          </select>
+          <button class="btn" onclick="loadRecipe()">加载</button>
+          <button class="btn" onclick="openImportModal()">📥 导入</button>
+          <button class="btn btn-primary" onclick="openSaveModal()">保存配方</button>
+          <button class="btn btn-icon btn-danger" onclick="deleteRecipe()" title="删除">✕</button>
+        </div>
+      </div>
+
+      <!-- Param Area -->
+      <div class="param-area">
+        <div class="param-header">
+          <h2>挤出参数</h2>
+          <span class="material-badge" id="currentMatBadge">PLA</span>
+        </div>
+        <div class="param-subheader" id="formulaDesc">纯 PLA 颗粒</div>
+
+        <!-- Formula Composition Bar -->
+        <div class="formula-bar">
+          <div class="formula-bar-title">配方组成</div>
+          <div class="formula-composition" id="formulaComposition"></div>
+          <div class="formula-legend" id="formulaLegend"></div>
+        </div>
+
+        <!-- Param Cards -->
+        <div class="param-cards">
+          <div class="param-card" id="card-barrelTemp">
+            <div class="param-card-top">
+              <div style="display:flex;align-items:center;gap:12px;">
+                <div class="param-card-icon">🔥</div>
+                <div class="param-card-label">料桶温度</div>
+              </div>
+              <span class="param-card-warn">⚠️</span>
+            </div>
+            <div class="param-value-row">
+              <span class="param-value" id="val-barrelTemp">180</span>
+              <span class="param-unit">°C</span>
+            </div>
+            <input type="range" class="param-slider" id="slider-barrelTemp" min="120" max="320" step="1" value="180" oninput="onParam('barrelTemp',this.value)">
+            <div class="param-slider-marks"><span>120</span><span>220</span><span>320</span></div>
+            <div class="param-hint" id="hint-barrelTemp">推荐: 170 – 200 °C</div>
+          </div>
+
+          <div class="param-card" id="card-screwSpeed">
+            <div class="param-card-top">
+              <div style="display:flex;align-items:center;gap:12px;">
+                <div class="param-card-icon">⚙️</div>
+                <div class="param-card-label">螺杆速度</div>
+              </div>
+              <span class="param-card-warn">⚠️</span>
+            </div>
+            <div class="param-value-row">
+              <span class="param-value" id="val-screwSpeed">30</span>
+              <span class="param-unit">RPM</span>
+            </div>
+            <input type="range" class="param-slider" id="slider-screwSpeed" min="5" max="80" step="1" value="30" oninput="onParam('screwSpeed',this.value)">
+            <div class="param-slider-marks"><span>5</span><span>42</span><span>80</span></div>
+            <div class="param-hint" id="hint-screwSpeed">推荐: 20 – 40 RPM</div>
+          </div>
+
+          <div class="param-card" id="card-tractionSpeed">
+            <div class="param-card-top">
+              <div style="display:flex;align-items:center;gap:12px;">
+                <div class="param-card-icon">📦</div>
+                <div class="param-card-label">牵引速度</div>
+              </div>
+              <span class="param-card-warn">⚠️</span>
+            </div>
+            <div class="param-value-row">
+              <span class="param-value" id="val-tractionSpeed">35</span>
+              <span class="param-unit">mm/s</span>
+            </div>
+            <input type="range" class="param-slider" id="slider-tractionSpeed" min="5" max="80" step="1" value="35" oninput="onParam('tractionSpeed',this.value)">
+            <div class="param-slider-marks"><span>5</span><span>42</span><span>80</span></div>
+            <div class="param-hint" id="hint-tractionSpeed">推荐: 25 – 45 mm/s</div>
+          </div>
+        </div>
+
+        <!-- Recipe Library -->
+        <div class="recipe-section">
+          <div class="recipe-section-header">
+            <h3>配方库</h3>
+            <span style="font-size:12px;color:var(--text-3);" id="recipeCount">0 个配方</span>
+          </div>
+          <div class="recipe-grid" id="recipeGrid"></div>
+        </div>
+      </div>
+
+      <!-- Action Bar -->
+      <div class="action-bar">
+        <div class="action-bar-info" id="summaryText"><b>PLA</b> · #00D4AA · 180°C · 30 RPM · 35 mm/s</div>
+        <div class="action-bar-buttons">
+          <button class="btn" onclick="openExport('json')">导出 JSON</button>
+          <button class="btn" onclick="openExport('text')">导出摘要</button>
+          <button class="btn btn-primary" onclick="copySummary()">复制配方</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Save Modal -->
+<div class="modal-overlay" id="saveModal">
+  <div class="modal">
+    <h3>保存配方</h3>
+    <p>为当前配方命名，保存到配方库</p>
+    <input type="text" class="modal-input" id="recipeName" placeholder="如：PLA+碳纤维 黑色 高强度" onkeydown="if(event.key==='Enter')saveRecipe()">
+    <div class="modal-actions">
+      <button class="btn" onclick="closeSaveModal()">取消</button>
+      <button class="btn btn-primary" onclick="saveRecipe()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- Import Modal -->
+<div class="modal-overlay" id="importModal">
+  <div class="modal" style="width:480px;">
+    <h3>导入配方</h3>
+    <p>上传 JSON 格式的配方文件，像 Photoshop 预设一样管理你的配方</p>
+    <div class="import-area" id="importArea" onclick="document.getElementById('fileInput').click()">
+      <div class="import-icon">📥</div>
+      <p>点击选择文件或拖拽 JSON 到此处</p>
+    </div>
+    <input type="file" id="fileInput" accept=".json" style="display:none;" onchange="handleFileImport(event)">
+    <div id="importPreview" style="display:none;margin-bottom:16px;">
+      <div style="font-size:12px;color:var(--text-2);margin-bottom:8px;">预览：</div>
+      <div class="export-box" id="importPreviewBox" style="max-height:120px;"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeImportModal()">取消</button>
+      <button class="btn btn-primary" id="importConfirmBtn" onclick="confirmImport()" disabled>导入</button>
+    </div>
+  </div>
+</div>
+
+<!-- Export Modal -->
+<div class="modal-overlay" id="exportModal">
+  <div class="modal" style="width:520px;">
+    <h3 id="exportTitle">导出</h3>
+    <p id="exportSub">复制内容或下载文件</p>
+    <div class="export-box" id="exportBox"></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeExport()">关闭</button>
+      <button class="btn" onclick="downloadExport()">下载文件</button>
+      <button class="btn btn-primary" onclick="copyExport()">复制内容</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"><span class="toast-icon">✓</span><span id="toastText"></span></div>
+
+<script>
+// ===== Material Data =====
+const MATERIALS = {
+  PLA:   {name:'PLA',  barrel:180,screw:30,traction:35,range:{barrel:[170,200],screw:[20,40],traction:[25,45]}},
+  PETG:  {name:'PETG', barrel:220,screw:25,traction:30,range:{barrel:[210,235],screw:[18,35],traction:[20,40]}},
+  ABS:   {name:'ABS',  barrel:210,screw:28,traction:32,range:{barrel:[200,230],screw:[20,38],traction:[22,42]}},
+  TPU:   {name:'TPU',  barrel:190,screw:15,traction:20,range:{barrel:[180,200],screw:[10,22],traction:[15,28]}},
+  Nylon: {name:'Nylon',barrel:240,screw:20,traction:25,range:{barrel:[230,260],screw:[15,30],traction:[18,32]}},
+  ASA:   {name:'ASA',  barrel:230,screw:25,traction:28,range:{barrel:[220,245],screw:[18,35],traction:[20,38]}},
+  PC:    {name:'PC',   barrel:260,screw:18,traction:22,range:{barrel:[250,280],screw:[12,28],traction:[16,30]}},
+  HIPS:  {name:'HIPS', barrel:200,screw:28,traction:32,range:{barrel:[190,215],screw:[20,38],traction:[22,42]}},
+  PP:    {name:'PP',   barrel:200,screw:25,traction:30,range:{barrel:[190,215],screw:[18,35],traction:[20,40]}},
+  POM:   {name:'POM',  barrel:190,screw:20,traction:25,range:{barrel:[180,205],screw:[15,30],traction:[18,32]}},
+};
+
+// ===== Colors =====
+const COLORS = [
+  '#FFFFFF','#D9D9D9','#A0A0A0','#555555','#1A1A1A','#000000',
+  '#FF0000','#DC2626','#FF4500','#FF8C00','#F59E0B','#FFD700',
+  '#22C55E','#16A34A','#065F46','#10B981','#00D4AA','#0D9488',
+  '#00B4D8','#0284C7','#1E40AF','#1D4ED8','#3B82F6','#6366F1',
+  '#7C3AED','#A855F7','#C026D3','#DB2777','#EC4899','#F472B6',
+  '#8B4513','#A0522D','#D2691E','#F5DEB3',
+];
+
+// ===== Additives =====
+const ADDITIVES = {
+  carbonFiber: {name:'碳纤维',icon:'🔗',desc:'增强强度和刚性',maxPct:30,defaultPct:10,
+    paramEffect:{barrel:5,screw:-3,traction:-2}},
+  coffeeGrounds:{name:'咖啡渣',icon:'☕',desc:'自然纹理质感',maxPct:20,defaultPct:8,
+    paramEffect:{barrel:-5,screw:-2,traction:-3}},
+  fluorescent:{name:'荧光粉',icon:'✨',desc:'紫外线下发光',maxPct:10,defaultPct:3,
+    paramEffect:{barrel:-2,screw:0,traction:0}},
+  metalPowder:{name:'金属粉',icon:'🔩',desc:'金属质感外观',maxPct:40,defaultPct:15,
+    paramEffect:{barrel:8,screw:-4,traction:-3}},
+  woodFill:{name:'木粉',icon:'🪵',desc:'木质外观可打磨',maxPct:25,defaultPct:10,
+    paramEffect:{barrel:-8,screw:-3,traction:-2}},
+  glowPowder:{name:'夜光粉',icon:'🌟',desc:'暗处自发光',maxPct:15,defaultPct:5,
+    paramEffect:{barrel:-3,screw:-1,traction:0}},
+  carbonBlack:{name:'碳黑',icon:'⚫',desc:'增强 UV 耐候性',maxPct:5,defaultPct:2,
+    paramEffect:{barrel:2,screw:0,traction:0}},
+  glassFiber:{name:'玻璃纤维',icon:'🔷',desc:'高强度绝缘',maxPct:30,defaultPct:12,
+    paramEffect:{barrel:10,screw:-5,traction:-3}},
+};
+
+// ===== Built-in Recipes =====
+const BUILTIN_RECIPES = {
+  'PLA 白色 标准':{material:'PLA',blend:null,blendPct:0,colorMethod:'powder',color:'#FFFFFF',dosage:1.0,additives:{},barrel:180,screw:30,traction:35},
+  'PLA+碳纤维 黑色 高强度':{material:'PLA',blend:null,blendPct:0,colorMethod:'powder',color:'#1A1A1A',dosage:1.5,additives:{carbonFiber:12},barrel:185,screw:27,traction:33},
+  'PLA+咖啡渣 棕色 质感':{material:'PLA',blend:null,blendPct:0,colorMethod:'powder',color:'#8B4513',dosage:1.0,additives:{coffeeGrounds:10},barrel:175,screw:28,traction:32},
+  'PETG 透明 标准':{material:'PETG',blend:null,blendPct:0,colorMethod:'oil',color:'#00B4D8',dosage:0.5,additives:{},barrel:225,screw:25,traction:30},
+  'PLA+PETG 混合 银色':{material:'PLA',blend:'PETG',blendPct:70,colorMethod:'powder',color:'#A0A0A0',dosage:1.0,additives:{metalPowder:8},barrel:195,screw:28,traction:33},
+  'TPU+荧光粉 夜光绿':{material:'TPU',blend:null,blendPct:0,colorMethod:'powder',color:'#22C55E',dosage:2.0,additives:{glowPowder:5,fluorescent:3},barrel:190,screw:15,traction:20},
+  'Nylon+玻纤 黑色 工业':{material:'Nylon',blend:null,blendPct:0,colorMethod:'powder',color:'#1A1A1A',dosage:1.5,additives:{glassFiber:15},barrel:248,screw:18,traction:23},
+  'ABS+碳黑 红色 耐候':{material:'ABS',blend:null,blendPct:0,colorMethod:'powder',color:'#DC2626',dosage:1.2,additives:{carbonBlack:2},barrel:215,screw:28,traction:32},
+};
+
+// ===== State =====
+let state = {
+  material:'PLA', blend:null, blendPct:70,
+  colorMethod:'none', color:'#00D4AA', dosage:1.0,
+  additives:{},
+  barrelTemp:180, screwSpeed:30, tractionSpeed:35,
+};
+let recentColors = [];
+let exportContent = '';
+let importData = null;
+
+// ===== Init =====
+function init(){
+  renderMaterials(); renderBlendMaterials(); renderColors(); renderAdditives();
+  renderRecentColors(); updatePelletPreview(); updateFormulaBar();
+  loadRecipeSelect(); renderRecipeGrid(); updateAllParams(); updateSummary();
+  bindColorInputs(); updateParamByFormula();
+}
+
+function bindColorInputs(){
+  document.getElementById('customColor').addEventListener('input',e=>setColor(e.target.value));
+  document.getElementById('hexInput').addEventListener('change',e=>{
+    let v=e.target.value.trim();
+    if(!v.startsWith('#')) v='#'+v;
+    if(/^#[0-9A-Fa-f]{6}$/.test(v)) setColor(v);
+    else{e.target.value=state.color.toUpperCase();showToast('颜色格式无效','error');}
+  });
+}
+
+// ===== Tab Switch =====
+function switchTab(tab){
+  document.querySelectorAll('.sidebar-tab').forEach((t,i)=>{
+    t.classList.toggle('active',['granule','color','additive','preview'][i]===tab);
+  });
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('tab-'+tab).classList.add('active');
+  if(tab==='preview'){updatePelletPreview();updatePreviewFormula();}
+}
+
+// ===== Materials =====
+function renderMaterials(){
+  const grid=document.getElementById('materialGrid');
+  grid.innerHTML='';
+  Object.keys(MATERIALS).forEach(key=>{
+    const m=MATERIALS[key];
+    const card=document.createElement('div');
+    card.className='material-card'+(key===state.material?' active':'');
+    card.innerHTML=`<div class="mat-name">${m.name}</div><div class="mat-temp">${m.barrel}°C</div>`;
+    card.onclick=()=>selectMaterial(key);
+    grid.appendChild(card);
+  });
+}
+
+function renderBlendMaterials(){
+  const grid=document.getElementById('blendGrid');
+  grid.innerHTML='';
+  // "None" option
+  const noneCard=document.createElement('div');
+  noneCard.className='material-card'+(!state.blend?' active':'');
+  noneCard.innerHTML=`<div class="mat-name" style="color:var(--text-3)">无混合</div>`;
+  noneCard.onclick=()=>{state.blend=null;renderBlendMaterials();document.getElementById('blendSection').style.display='none';updateParamByFormula();updateFormulaBar();updateSummary();};
+  grid.appendChild(noneCard);
+  Object.keys(MATERIALS).forEach(key=>{
+    if(key===state.material) return;
+    const m=MATERIALS[key];
+    const card=document.createElement('div');
+    card.className='material-card'+(key===state.blend?' active':'');
+    card.innerHTML=`<div class="mat-name">${m.name}</div><div class="mat-temp">${m.barrel}°C</div>`;
+    card.onclick=()=>selectBlend(key);
+    grid.appendChild(card);
+  });
+}
+
+function selectMaterial(key){
+  state.material=key;
+  if(state.blend===key) state.blend=null;
+  applyMaterialDefaults();
+  renderMaterials(); renderBlendMaterials();
+  document.getElementById('blendSection').style.display=state.blend?'block':'none';
+  updateAllParams(); updateFormulaBar(); updateSummary();
+  document.getElementById('currentMatBadge').textContent=MATERIALS[key].name;
+}
+
+function selectBlend(key){
+  state.blend=key;
+  renderBlendMaterials();
+  document.getElementById('blendSection').style.display='block';
+  document.getElementById('blendLabelA').textContent=MATERIALS[state.material].name;
+  document.getElementById('blendNameA').textContent=MATERIALS[state.material].name+' '+state.blendPct+'%';
+  document.getElementById('blendNameB').textContent=MATERIALS[key].name+' '+(100-state.blendPct)+'%';
+  updateBlendUI();
+  updateParamByFormula(); updateFormulaBar(); updateSummary();
+}
+
+function onBlendChange(val){
+  state.blendPct=parseInt(val);
+  updateBlendUI(); updateParamByFormula(); updateFormulaBar(); updateSummary();
+}
+
+function updateBlendUI(){
+  const a=state.blendPct, b=100-a;
+  document.getElementById('blendFillA').style.width=a+'%';
+  document.getElementById('blendFillB').style.width=b+'%';
+  document.getElementById('blendPctA').textContent=a+'%';
+  document.getElementById('blendNameA').textContent=MATERIALS[state.material].name+' '+a+'%';
+  document.getElementById('blendNameB').textContent=state.blend?MATERIALS[state.blend].name+' '+b+'%':'';
+  document.getElementById('blendSlider').value=a;
+}
+
+function applyMaterialDefaults(){
+  const m=MATERIALS[state.material];
+  state.barrelTemp=m.barrel; state.screwSpeed=m.screw; state.tractionSpeed=m.traction;
+}
+
+// Calculate recommended params based on blend + additives
+function updateParamByFormula(){
+  const m=MATERIALS[state.material];
+  let barrel=m.barrel, screw=m.screw, traction=m.traction;
+
+  // Blend adjustment
+  if(state.blend){
+    const m2=MATERIALS[state.blend];
+    const a=state.blendPct/100, b=1-a;
+    barrel=Math.round(m.barrel*a+m2.barrel*b);
+    screw=Math.round(m.screw*a+m2.screw*b);
+    traction=Math.round(m.traction*a+m2.traction*b);
+  }
+
+  // Additive adjustments
+  Object.entries(state.additives).forEach(([key,pct])=>{
+    const ad=ADDITIVES[key];
+    if(ad&&ad.paramEffect){
+      const factor=pct/ad.maxPct;
+      barrel+=Math.round(ad.paramEffect.barrel*factor);
+      screw+=Math.round(ad.paramEffect.screw*factor);
+      traction+=Math.round(ad.paramEffect.traction*factor);
+    }
+  });
+
+  state.barrelTemp=barrel; state.screwSpeed=screw; state.tractionSpeed=traction;
+  updateAllParams();
+}
+
+// ===== Colors =====
+function setColorMethod(method){
+  state.colorMethod=method;
+  document.querySelectorAll('.color-method-btn').forEach((b,i)=>{
+    const methods=['none','powder','oil'];
+    b.classList.toggle('active',methods[i]===method);
+  });
+  document.getElementById('colorPickerArea').style.display=method==='none'?'none':'block';
+  document.getElementById('dosageLabel').textContent=method==='powder'?'色粉':'扩散油';
+  updateFormulaBar(); updateSummary();
+}
+
+function renderColors(){
+  const grid=document.getElementById('colorGrid');
+  grid.innerHTML='';
+  COLORS.forEach(c=>{
+    const dot=document.createElement('div');
+    dot.className='color-dot'+(c.toLowerCase()===state.color.toLowerCase()?' active':'');
+    dot.style.background=c; dot.title=c;
+    dot.onclick=()=>setColor(c);
+    grid.appendChild(dot);
+  });
+}
+
+function setColor(c){
+  state.color=c;
+  document.getElementById('customColor').value=c;
+  document.getElementById('hexInput').value=c.toUpperCase();
+  renderColors(); addRecentColor(c);
+  updatePelletPreview(); updateFormulaBar(); updateSummary();
+}
+
+function onDosageChange(val){
+  state.dosage=parseFloat(val);
+  document.getElementById('dosageVal').textContent=state.dosage.toFixed(1)+'%';
+  updateFormulaBar(); updateSummary();
+}
+
+function addRecentColor(c){
+  c=c.toLowerCase();
+  recentColors=recentColors.filter(x=>x.toLowerCase()!==c);
+  recentColors.unshift(c);
+  if(recentColors.length>8) recentColors=recentColors.slice(0,8);
+  renderRecentColors();
+}
+
+function renderRecentColors(){
+  const row=document.getElementById('recentColors');
+  if(!recentColors.length){row.innerHTML='<span class="recent-empty">暂无</span>';return;}
+  row.innerHTML='';
+  recentColors.forEach(c=>{
+    const dot=document.createElement('div');
+    dot.className='recent-dot'; dot.style.background=c;
+    dot.onclick=()=>setColor(c);
+    row.appendChild(dot);
+  });
+}
+
+// ===== Additives =====
+function renderAdditives(){
+  const list=document.getElementById('additiveList');
+  list.innerHTML='';
+  Object.entries(ADDITIVES).forEach(([key,ad])=>{
+    const active=state.additives[key]!==undefined;
+    const pct=active?state.additives[key]:ad.defaultPct;
+    const item=document.createElement('div');
+    item.className='additive-item'+(active?' active':'');
+    item.innerHTML=`
+      <div class="additive-top">
+        <div class="additive-info">
+          <span class="additive-icon">${ad.icon}</span>
+          <div>
+            <div class="additive-name">${ad.name}</div>
+            <div class="additive-desc">${ad.desc} · 最高${ad.maxPct}%</div>
+          </div>
+        </div>
+        <div class="additive-toggle${active?' on':''}" onclick="toggleAdditive('${key}')"></div>
+      </div>
+      <div class="additive-control">
+        <div class="additive-pct-row">
+          <input type="range" class="additive-pct-slider" min="0" max="${ad.maxPct}" step="1" value="${pct}"
+                 oninput="onAdditivePct('${key}',this.value)">
+          <span class="additive-pct-val" id="additivePct-${key}">${pct}%</span>
+        </div>
+      </div>
+    `;
+    list.appendChild(item);
+  });
+}
+
+function toggleAdditive(key){
+  if(state.additives[key]!==undefined){
+    delete state.additives[key];
+  }else{
+    state.additives[key]=ADDITIVES[key].defaultPct;
+  }
+  renderAdditives(); updateParamByFormula(); updateFormulaBar(); updateSummary();
+}
+
+function onAdditivePct(key,val){
+  state.additives[key]=parseInt(val);
+  document.getElementById('additivePct-'+key).textContent=val+'%';
+  updateParamByFormula(); updateFormulaBar(); updateSummary();
+}
+
+// ===== Pellet Preview =====
+function updatePelletPreview(){
+  const c=state.colorMethod==='none'?getMaterialColor():state.color;
+  const dark=shade(c,-0.35), light=shade(c,0.2);
+  const pellets=[];
+  const positions=[[50,30,1],[78,38,0.9],[30,42,1.1],[62,52,1],[42,60,0.95],[72,66,1.05],[52,74,0.9],[38,28,0.85],[66,22,0.8],[28,58,0.9]];
+  // Add speckles for additives
+  let speckles='';
+  if(state.additives.carbonFiber){speckles+=`<circle cx="45" cy="35" r="1.5" fill="#333"/><circle cx="68" cy="50" r="1.5" fill="#333"/><circle cx="55" cy="65" r="1.5" fill="#333"/>`;}
+  if(state.additives.coffeeGrounds){speckles+=`<circle cx="40" cy="50" r="1" fill="#3d1a0a"/><circle cx="72" cy="40" r="1" fill="#3d1a0a"/><circle cx="58" cy="70" r="1" fill="#3d1a0a"/>`;}
+  if(state.additives.metalPowder){speckles+=`<circle cx="48" cy="38" r="1.2" fill="#c0c0c0"/><circle cx="70" cy="58" r="1.2" fill="#a8a8a8"/><circle cx="35" cy="55" r="1" fill="#c0c0c0"/>`;}
+  if(state.additives.woodFill){speckles+=`<rect x="42" y="48" width="3" height="1" fill="#8B4513" rx="0.5"/><rect x="65" y="35" width="3" height="1" fill="#8B4513" rx="0.5"/>`;}
+  if(state.additives.glowPowder||state.additives.fluorescent){speckles+=`<circle cx="46" cy="40" r="1.5" fill="${state.additives.glowPowder?'#00ff88':'#ffff00'}" opacity="0.8"/><circle cx="70" cy="55" r="1.5" fill="${state.additives.glowPowder?'#00ff88':'#ffff00'}" opacity="0.8"/>`;}
+
+  positions.forEach(([x,y,s])=>{
+    pellets.push(`<ellipse cx="${x}" cy="${y}" rx="${9*s}" ry="${5*s}" fill="${c}" opacity="0.9"/><ellipse cx="${x-2*s}" cy="${y-1*s}" rx="${5*s}" ry="${2.5*s}" fill="${light}" opacity="0.4"/><ellipse cx="${x}" cy="${y+1.5*s}" rx="${9*s}" ry="${1.5*s}" fill="${dark}" opacity="0.3"/>`);
+  });
+  const svg=`<svg width="120" height="110" viewBox="0 0 100 100" style="filter:drop-shadow(0 6px 16px rgba(0,0,0,.5))">
+    <defs><radialGradient id="bowlG" cx="50%" cy="40%"><stop offset="0%" stop-color="#262a2f"/><stop offset="100%" stop-color="#15171a"/></radialGradient></defs>
+    <ellipse cx="50" cy="50" rx="46" ry="44" fill="url(#bowlG)" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+    ${pellets.join('')}${speckles}
+    <ellipse cx="50" cy="50" rx="46" ry="44" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+  </svg>`;
+  document.getElementById('pelletPreview').innerHTML=svg;
+}
+
+function getMaterialColor(){
+  // Natural pellet color per material
+  const natural={PLA:'#F5DEB3',PETG:'#E8E8E8',ABS:'#D9D9D9',TPU:'#F5DEB3',Nylon:'#E8E8E8',ASA:'#D9D9D9',PC:'#E8E8E8',HIPS:'#F5F5DC',PP:'#F0F0F0',POM:'#F5F5F5'};
+  return natural[state.material]||'#E8E8E8';
+}
+
+function shade(hex,factor){
+  const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
+  if(factor<0){const f=1+factor;return `rgb(${Math.floor(r*f)},${Math.floor(g*f)},${Math.floor(b*f)})`;}
+  return `rgb(${Math.min(255,Math.floor(r+(255-r)*factor))},${Math.min(255,Math.floor(g+(255-g)*factor))},${Math.min(255,Math.floor(b+(255-b)*factor))})`;
+}
+
+function updatePreviewFormula(){
+  const el=document.getElementById('previewFormula');
+  el.innerHTML=getFormulaDescription();
+}
+
+// ===== Formula Bar =====
+function updateFormulaBar(){
+  const comp=document.getElementById('formulaComposition');
+  const legend=document.getElementById('formulaLegend');
+  const segs=[];
+  const legends=[];
+  let total=100;
+
+  // Materials
+  if(state.blend){
+    const a=state.blendPct, b=100-a;
+    segs.push({pct:a,color:'#00d4aa',label:MATERIALS[state.material].name});
+    segs.push({pct:b,color:'#3b82f6',label:MATERIALS[state.blend].name});
+    legends.push({color:'#00d4aa',text:`${MATERIALS[state.material].name} ${a}%`});
+    legends.push({color:'#3b82f6',text:`${MATERIALS[state.blend].name} ${b}%`});
+  }else{
+    segs.push({pct:100,color:'#00d4aa',label:MATERIALS[state.material].name});
+    legends.push({color:'#00d4aa',text:`${MATERIALS[state.material].name} 100%`});
+  }
+
+  // Coloring
+  if(state.colorMethod!=='none'){
+    const methodName=state.colorMethod==='powder'?'色粉':'扩散油';
+    segs.push({pct:0,color:'#f59e0b',label:methodName,special:true});
+    legends.push({color:'#f59e0b',text:`${methodName} ${state.dosage.toFixed(1)}% (${state.color.toUpperCase()})`});
+  }
+
+  // Additives
+  Object.entries(state.additives).forEach(([key,pct])=>{
+    const ad=ADDITIVES[key];
+    segs.push({pct:0,color:'#a855f7',label:ad.name,special:true});
+    legends.push({color:'#a855f7',text:`${ad.icon} ${ad.name} ${pct}%`});
+  });
+
+  comp.innerHTML='';
+  segs.forEach(s=>{
+    const div=document.createElement('div');
+    div.className='formula-seg';
+    div.style.background=s.color;
+    if(s.special){
+      div.style.minWidth='4px'; div.style.maxWidth='4px';
+      div.title=s.label;
+    }else{
+      div.style.flex=s.pct;
+      div.textContent=s.pct>=15?s.label:'';
+    }
+    comp.appendChild(div);
+  });
+
+  legend.innerHTML='';
+  legends.forEach(l=>{
+    const item=document.createElement('div');
+    item.className='formula-legend-item';
+    item.innerHTML=`<div class="formula-legend-dot" style="background:${l.color}"></div>${l.text}`;
+    legend.appendChild(item);
+  });
+
+  // Update description
+  document.getElementById('formulaDesc').textContent=getFormulaDescription();
+}
+
+function getFormulaDescription(){
+  let parts=[];
+  if(state.blend){
+    parts.push(`${MATERIALS[state.material].name}/${MATERIALS[state.blend].name} ${state.blendPct}/${100-state.blendPct}`);
+  }else{
+    parts.push(MATERIALS[state.material].name);
+  }
+  if(state.colorMethod!=='none'){
+    parts.push(`${state.colorMethod==='powder'?'色粉':'扩散油'} ${state.color.toUpperCase()} ${state.dosage.toFixed(1)}%`);
+  }
+  Object.entries(state.additives).forEach(([key,pct])=>{
+    parts.push(`${ADDITIVES[key].name} ${pct}%`);
+  });
+  return parts.join(' · ');
+}
+
+// ===== Parameters =====
+function onParam(key,val){
+  state[key]=parseFloat(val);
+  updateParamUI(key); updateSummary();
+}
+
+function updateParamUI(key){
+  document.getElementById('val-'+key).textContent=state[key];
+  document.getElementById('slider-'+key).value=state[key];
+  const m=MATERIALS[state.material];
+  const range=m.range[key.replace('Temp','').replace('Speed','')==='barrel'?'barrel':key.replace('Temp','').replace('Speed','')==='screw'?'screw':'traction'];
+  const rangeMap={barrelTemp:'barrel',screwSpeed:'screw',tractionSpeed:'traction'};
+  const r=m.range[rangeMap[key]];
+  const card=document.getElementById('card-'+key);
+  const hint=document.getElementById('hint-'+key);
+  if(r){
+    const [min,max]=r;
+    const labels={barrelTemp:'°C',screwSpeed:'RPM',tractionSpeed:'mm/s'};
+    hint.textContent=`推荐: ${min} – ${max} ${labels[key]}`;
+    if(state[key]<min||state[key]>max){
+      card.classList.add('warn'); hint.classList.add('warn');
+      hint.textContent=`推荐: ${min} – ${max} ${labels[key]} · 超出范围`;
+    }else{
+      card.classList.remove('warn'); hint.classList.remove('warn');
+    }
+  }
+}
+
+function updateAllParams(){
+  ['barrelTemp','screwSpeed','tractionSpeed'].forEach(updateParamUI);
+  document.getElementById('currentMatBadge').textContent=MATERIALS[state.material].name;
+}
+
+function updateSummary(){
+  const m=MATERIALS[state.material];
+  let s=`<b>${m.name}`;
+  if(state.blend) s+=`+${MATERIALS[state.blend].name}`;
+  s+=`</b>`;
+  if(state.colorMethod!=='none') s+=` · ${state.color.toUpperCase()}`;
+  s+=` · ${state.barrelTemp}°C · ${state.screwSpeed} RPM · ${state.tractionSpeed} mm/s`;
+  const addKeys=Object.keys(state.additives);
+  if(addKeys.length) s+=` · 添加剂: ${addKeys.map(k=>ADDITIVES[k].name).join(',')}`;
+  document.getElementById('summaryText').innerHTML=s;
+}
+
+// ===== Recipe Library =====
+function getUserRecipes(){try{return JSON.parse(localStorage.getItem('filaforge_recipes')||'{}')}catch(e){return{}}}
+function saveUserRecipes(o){try{localStorage.setItem('filaforge_recipes',JSON.stringify(o))}catch(e){}}
+
+function loadRecipeSelect(){
+  const sel=document.getElementById('recipeSelect');
+  sel.innerHTML='<option value="">— 选择配方 —</option>';
+  const g1=document.createElement('optgroup');g1.label='出厂配方';
+  Object.keys(BUILTIN_RECIPES).forEach(n=>{const o=document.createElement('option');o.value='b:'+n;o.textContent=n;g1.appendChild(o);});
+  sel.appendChild(g1);
+  const user=getUserRecipes();const uk=Object.keys(user);
+  if(uk.length){const g2=document.createElement('optgroup');g2.label='我的配方';
+    uk.forEach(n=>{const o=document.createElement('option');o.value='u:'+n;o.textContent=n;g2.appendChild(o);});sel.appendChild(g2);}
+}
+
+function renderRecipeGrid(){
+  const grid=document.getElementById('recipeGrid');grid.innerHTML='';let count=0;
+  Object.entries(BUILTIN_RECIPES).forEach(([name,r])=>{grid.appendChild(makeRecipeCard(name,r,true));count++;});
+  Object.entries(getUserRecipes()).forEach(([name,r])=>{grid.appendChild(makeRecipeCard(name,r,false));count++;});
+  document.getElementById('recipeCount').textContent=count+' 个配方';
+}
+
+function makeRecipeCard(name,r,builtin){
+  const card=document.createElement('div');
+  card.className='recipe-card';
+  let tags=[];
+  if(r.colorMethod&&r.colorMethod!=='none') tags.push(`<span class="recipe-tag color">${r.colorMethod==='powder'?'色粉':'扩散油'}</span>`);
+  if(r.additives&&Object.keys(r.additives).length) tags.push(`<span class="recipe-tag additive">+${Object.keys(r.additives).length}添加剂</span>`);
+  let matText=r.material;
+  if(r.blend) matText+=`+${r.blend}`;
+  card.innerHTML=`
+    ${builtin?'<span class="recipe-card-builtin">出厂</span>':''}
+    <div class="recipe-card-top">
+      <div class="recipe-card-color" style="background:${r.colorMethod==='none'?'var(--surface-3)':r.color}"></div>
+      <div class="recipe-card-name">${name}</div>
+    </div>
+    <div class="recipe-card-tags">${tags.join('')}</div>
+    <div class="recipe-card-params">
+      <span class="recipe-card-param"><b>${matText}</b></span>
+      <span class="recipe-card-param">${r.barrel}°C</span>
+      <span class="recipe-card-param">${r.screw} RPM</span>
+      <span class="recipe-card-param">${r.traction} mm/s</span>
+    </div>`;
+  card.onclick=()=>{applyRecipe(r);showToast(`已加载: ${name}`,'success');};
+  return card;
+}
+
+function applyRecipe(r){
+  state.material=r.material;state.blend=r.blend||null;state.blendPct=r.blendPct||70;
+  state.colorMethod=r.colorMethod||'none';state.color=r.color||'#00D4AA';state.dosage=r.dosage||1.0;
+  state.additives={...(r.additives||{})};
+  state.barrelTemp=r.barrel;state.screwSpeed=r.screw;state.tractionSpeed=r.traction;
+  renderMaterials();renderBlendMaterials();renderColors();renderAdditives();
+  setColorMethod(state.colorMethod);
+  if(state.colorMethod!=='none') setColor(state.color);
+  document.getElementById('blendSection').style.display=state.blend?'block':'none';
+  if(state.blend) updateBlendUI();
+  updateAllParams();updateFormulaBar();updateSummary();
+}
+
+function loadRecipe(){
+  const val=document.getElementById('recipeSelect').value;
+  if(!val){showToast('请先选择配方','error');return;}
+  const [type,name]=val.split(':');
+  const r=type==='b'?BUILTIN_RECIPES[name]:getUserRecipes()[name];
+  if(!r){showToast('配方不存在','error');return;}
+  applyRecipe(r);showToast(`已加载: ${name}`,'success');
+}
+
+function openSaveModal(){document.getElementById('recipeName').value='';document.getElementById('saveModal').classList.add('show');setTimeout(()=>document.getElementById('recipeName').focus(),100);}
+function closeSaveModal(){document.getElementById('saveModal').classList.remove('show');}
+
+function saveRecipe(){
+  const name=document.getElementById('recipeName').value.trim();
+  if(!name){showToast('请输入配方名称','error');return;}
+  const recipes=getUserRecipes();
+  recipes[name]={...state};
+  saveUserRecipes(recipes);loadRecipeSelect();renderRecipeGrid();closeSaveModal();
+  showToast(`配方 "${name}" 已保存`,'success');
+}
+
+function deleteRecipe(){
+  const val=document.getElementById('recipeSelect').value;
+  if(!val){showToast('请先选择配方','error');return;}
+  const [type,name]=val.split(':');
+  if(type==='b'){showToast('出厂配方不可删除','error');return;}
+  const recipes=getUserRecipes();delete recipes[name];saveUserRecipes(recipes);
+  loadRecipeSelect();renderRecipeGrid();showToast(`配方 "${name}" 已删除`,'success');
+}
+
+// ===== Import / Export =====
+function buildJSON(){
+  return JSON.stringify({
+    material:MATERIALS[state.material].name,
+    blend:state.blend?MATERIALS[state.blend].name:null,
+    blendPct:state.blend?state.blendPct:null,
+    colorMethod:state.colorMethod,
+    color:state.color.toUpperCase(),
+    dosage:state.dosage,
+    additives:Object.fromEntries(Object.entries(state.additives).map(([k,v])=>[ADDITIVES[k].name,v])),
+    parameters:{barrel_temperature:state.barrelTemp,screw_speed:state.screwSpeed,traction_speed:state.tractionSpeed},
+    units:{barrel_temperature:'°C',screw_speed:'RPM',traction_speed:'mm/s'},
+    timestamp:new Date().toISOString(),
+  },null,2);
+}
+
+function buildText(){
+  const m=MATERIALS[state.material];
+  let txt=`╔═══════════════════════════╗\n║    FilaForge 配方卡       ║\n╚═══════════════════════════╝\n\n`;
+  txt+=`  材料:     ${m.name}`;
+  if(state.blend) txt+=` + ${MATERIALS[state.blend].name} (${state.blendPct}/${100-state.blendPct})`;
+  txt+=`\n  颜色:     ${state.colorMethod==='none'?'自然色':state.color.toUpperCase()+' ('+(state.colorMethod==='powder'?'色粉':'扩散油')+' '+state.dosage.toFixed(1)+'%)'}\n`;
+  txt+=`  日期:     ${new Date().toLocaleString('zh-CN')}\n`;
+  const addKeys=Object.keys(state.additives);
+  if(addKeys.length){
+    txt+=`\n  ──── 添加剂 ────\n`;
+    addKeys.forEach(k=>{txt+=`  ${ADDITIVES[k].icon} ${ADDITIVES[k].name}: ${state.additives[k]}%\n`;});
+  }
+  txt+=`\n  ──── 挤出参数 ────\n`;
+  txt+=`  料桶温度:  ${state.barrelTemp} °C\n  螺杆速度:  ${state.screwSpeed} RPM\n  牵引速度:  ${state.tractionSpeed} mm/s\n`;
+  txt+=`═══════════════════════════`;
+  return txt;
+}
+
+function openExport(type){
+  const title=document.getElementById('exportTitle');
+  const sub=document.getElementById('exportSub');
+  const box=document.getElementById('exportBox');
+  if(type==='json'){title.textContent='导出 JSON';sub.textContent='结构化数据，可用于设备导入或配方分享';exportContent=buildJSON();}
+  else{title.textContent='导出摘要';sub.textContent='文本格式配方卡';exportContent=buildText();}
+  box.textContent=exportContent;
+  document.getElementById('exportModal').classList.add('show');
+}
+function closeExport(){document.getElementById('exportModal').classList.remove('show');}
+function copyExport(){navigator.clipboard.writeText(exportContent).then(()=>showToast('已复制到剪贴板','success')).catch(()=>showToast('复制失败','error'));}
+function copySummary(){navigator.clipboard.writeText(buildText()).then(()=>showToast('配方已复制','success')).catch(()=>showToast('复制失败','error'));}
+function downloadExport(){
+  const blob=new Blob([exportContent],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;a.download='filaforge-recipe-'+Date.now()+'.json';a.click();
+  URL.revokeObjectURL(url);
+  showToast('文件已下载','success');
+}
+
+// Import
+function openImportModal(){
+  importData=null;
+  document.getElementById('importPreview').style.display='none';
+  document.getElementById('importConfirmBtn').disabled=true;
+  document.getElementById('fileInput').value='';
+  document.getElementById('importModal').classList.add('show');
+}
+function closeImportModal(){document.getElementById('importModal').classList.remove('show');}
+
+function handleFileImport(event){
+  const file=event.target.files[0];
+  if(!file) return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      const data=JSON.parse(e.target.result);
+      // Validate
+      if(!data.material&&!data.parameters) throw new Error('Invalid format');
+      importData=data;
+      document.getElementById('importPreviewBox').textContent=JSON.stringify(data,null,2);
+      document.getElementById('importPreview').style.display='block';
+      document.getElementById('importConfirmBtn').disabled=false;
+    }catch(err){
+      showToast('文件格式无效','error');
+      importData=null;
+      document.getElementById('importPreview').style.display='none';
+      document.getElementById('importConfirmBtn').disabled=true;
+    }
+  };
+  reader.readAsText(file);
+}
+
+function confirmImport(){
+  if(!importData){showToast('无导入数据','error');return;}
+  // Map back from names to keys
+  const matKey=Object.keys(MATERIALS).find(k=>MATERIALS[k].name===importData.material)||'PLA';
+  const blendKey=importData.blend?Object.keys(MATERIALS).find(k=>MATERIALS[k].name===importData.blend):null;
+  const additives={};
+  if(importData.additives){
+    Object.entries(importData.additives).forEach(([name,pct])=>{
+      const key=Object.keys(ADDITIVES).find(k=>ADDITIVES[k].name===name);
+      if(key) additives[key]=pct;
+    });
+  }
+  const recipe={
+    material:matKey,blend:blendKey,blendPct:importData.blendPct||70,
+    colorMethod:importData.colorMethod||'none',color:importData.color||'#00D4AA',dosage:importData.dosage||1.0,
+    additives,barrel:importData.parameters?.barrel_temperature||180,
+    screw:importData.parameters?.screw_speed||30,traction:importData.parameters?.traction_speed||35,
+  };
+  // Save to user recipes
+  const name='导入配方 '+new Date().toLocaleTimeString('zh-CN').slice(0,5);
+  const recipes=getUserRecipes();recipes[name]=recipe;saveUserRecipes(recipes);
+  loadRecipeSelect();renderRecipeGrid();closeImportModal();
+  applyRecipe(recipe);
+  showToast(`配方已导入`,'success');
+}
+
+// Drag & drop
+document.addEventListener('dragover',e=>{e.preventDefault();const area=document.getElementById('importArea');if(area&&area.parentElement.parentElement.classList.contains('show')){area.classList.add('dragover');}});
+document.addEventListener('dragleave',e=>{const area=document.getElementById('importArea');if(area)area.classList.remove('dragover');});
+document.addEventListener('drop',e=>{
+  e.preventDefault();
+  const area=document.getElementById('importArea');
+  if(area)area.classList.remove('dragover');
+  if(document.getElementById('importModal').classList.contains('show')&&e.dataTransfer.files.length){
+    document.getElementById('fileInput').files=e.dataTransfer.files;
+    handleFileImport({target:{files:e.dataTransfer.files}});
+  }
+});
+
+// Toast
+function showToast(msg,type){
+  const t=document.getElementById('toast');
+  const icon=t.querySelector('.toast-icon');
+  document.getElementById('toastText').textContent=msg;
+  icon.textContent=type==='error'?'✕':'✓';
+  t.className='toast show'+(type?' '+type:'');
+  setTimeout(()=>t.className='toast',2500);
+}
+
+init();
+</script>
+</body>
+</html>
