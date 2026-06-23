@@ -118,8 +118,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',Ro
 .additive-pct-slider::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:var(--purple);cursor:pointer;border:2px solid var(--bg)}
 .additive-pct-val{font-size:12px;font-weight:600;min-width:36px;text-align:right}
 
-/* Pellet preview */
-.pellet-preview{display:flex;justify-content:center;padding:8px 0 4px}
+/* Spool 3D preview */
+.pellet-preview{display:flex;justify-content:center;align-items:center;padding:8px 0 4px;min-height:280px;position:relative}
+.pellet-preview canvas{border-radius:12px;cursor:grab}
+.pellet-preview canvas:active{cursor:grabbing}
+.spool-hint{font-size:11px;color:var(--text-3);text-align:center;margin-top:2px;letter-spacing:.3px}
+.spool-loading{font-size:12px;color:var(--text-3);padding:60px 0}
 
 /* Main Area */
 .main-area{flex:1;display:flex;flex-direction:column;overflow:hidden}
@@ -331,7 +335,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',Ro
         <!-- Tab: Preview -->
         <div class="tab-panel" id="tab-preview">
           <div class="sidebar-label">配方预览</div>
-          <div class="pellet-preview" id="pelletPreview"></div>
+          <div class="pellet-preview" id="pelletPreview"><div class="spool-loading">加载3D模型中…</div></div>
+          <div class="spool-hint">拖拽旋转 · 滚轮缩放</div>
           <div id="previewFormula" style="margin-top:16px;"></div>
         </div>
 
@@ -806,30 +811,13 @@ function onAdditivePct(key,val){
   updateParamByFormula(); updateFormulaBar(); updateSummary();
 }
 
-// ===== Pellet Preview =====
+// ===== Spool 3D Preview (Three.js) =====
 function updatePelletPreview(){
   const c=state.colorMethod==='none'?getMaterialColor():state.color;
-  const dark=shade(c,-0.35), light=shade(c,0.2);
-  const pellets=[];
-  const positions=[[50,30,1],[78,38,0.9],[30,42,1.1],[62,52,1],[42,60,0.95],[72,66,1.05],[52,74,0.9],[38,28,0.85],[66,22,0.8],[28,58,0.9]];
-  // Add speckles for additives
-  let speckles='';
-  if(state.additives.carbonFiber){speckles+=`<circle cx="45" cy="35" r="1.5" fill="#333"/><circle cx="68" cy="50" r="1.5" fill="#333"/><circle cx="55" cy="65" r="1.5" fill="#333"/>`;}
-  if(state.additives.coffeeGrounds){speckles+=`<circle cx="40" cy="50" r="1" fill="#3d1a0a"/><circle cx="72" cy="40" r="1" fill="#3d1a0a"/><circle cx="58" cy="70" r="1" fill="#3d1a0a"/>`;}
-  if(state.additives.metalPowder){speckles+=`<circle cx="48" cy="38" r="1.2" fill="#c0c0c0"/><circle cx="70" cy="58" r="1.2" fill="#a8a8a8"/><circle cx="35" cy="55" r="1" fill="#c0c0c0"/>`;}
-  if(state.additives.woodFill){speckles+=`<rect x="42" y="48" width="3" height="1" fill="#8B4513" rx="0.5"/><rect x="65" y="35" width="3" height="1" fill="#8B4513" rx="0.5"/>`;}
-  if(state.additives.glowPowder||state.additives.fluorescent){speckles+=`<circle cx="46" cy="40" r="1.5" fill="${state.additives.glowPowder?'#00ff88':'#ffff00'}" opacity="0.8"/><circle cx="70" cy="55" r="1.5" fill="${state.additives.glowPowder?'#00ff88':'#ffff00'}" opacity="0.8"/>`;}
-
-  positions.forEach(([x,y,s])=>{
-    pellets.push(`<ellipse cx="${x}" cy="${y}" rx="${9*s}" ry="${5*s}" fill="${c}" opacity="0.9"/><ellipse cx="${x-2*s}" cy="${y-1*s}" rx="${5*s}" ry="${2.5*s}" fill="${light}" opacity="0.4"/><ellipse cx="${x}" cy="${y+1.5*s}" rx="${9*s}" ry="${1.5*s}" fill="${dark}" opacity="0.3"/>`);
-  });
-  const svg=`<svg width="120" height="110" viewBox="0 0 100 100" style="filter:drop-shadow(0 6px 16px rgba(0,0,0,.5))">
-    <defs><radialGradient id="bowlG" cx="50%" cy="40%"><stop offset="0%" stop-color="#262a2f"/><stop offset="100%" stop-color="#15171a"/></radialGradient></defs>
-    <ellipse cx="50" cy="50" rx="46" ry="44" fill="url(#bowlG)" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
-    ${pellets.join('')}${speckles}
-    <ellipse cx="50" cy="50" rx="46" ry="44" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
-  </svg>`;
-  document.getElementById('pelletPreview').innerHTML=svg;
+  const matName=MATERIALS[state.material].name+(state.blend?'+'+MATERIALS[state.blend].name:'');
+  if(window.Spool3D&&window.Spool3D.ready){
+    window.Spool3D.update(c,state.additives,matName);
+  }
 }
 
 function getMaterialColor(){
@@ -1199,6 +1187,307 @@ function showToast(msg,type){
 }
 
 init();
+</script>
+
+<!-- ===== Three.js 3D Spool Viewer ===== -->
+<script type="importmap">
+{ "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js", "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/" } }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+(function(){
+  const container=document.getElementById('pelletPreview');
+  if(!container)return;
+
+  let scene,camera,renderer,controls,group;
+  let bodyMesh,capL,capR,strand,labelSprite;
+  let texCanvas,texCtx,bodyTex;
+
+  // ---- color helpers (canvas) ----
+  function hx2rgb(h){h=h.replace('#','');if(h.length===3)h=h.split('').map(c=>c+c).join('');return{r:parseInt(h.slice(0,2),16),g:parseInt(h.slice(2,4),16),b:parseInt(h.slice(4,6),16)};}
+  function cvshade(h,f){const{r,g,b}=hx2rgb(h);if(f<0){const t=1+f;return`rgb(${Math.floor(r*t)},${Math.floor(g*t)},${Math.floor(b*t)})`;}return`rgb(${Math.min(255,Math.floor(r+(255-r)*f))},${Math.min(255,Math.floor(g+(255-g)*f))},${Math.min(255,Math.floor(b+(255-b)*f))})`;}
+
+  // ---- deterministic random ----
+  let _seed=12345;
+  function rnd(){_seed=(_seed*16807)%2147483647;return _seed/2147483647;}
+
+  function init(){
+    const w=container.clientWidth||280,h=280;
+
+    scene=new THREE.Scene();
+    camera=new THREE.PerspectiveCamera(35,w/h,0.1,100);
+    camera.position.set(7,3.5,8.5);
+
+    renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});
+    renderer.setSize(w,h);
+    renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+    renderer.shadowMap.enabled=true;
+    renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+    renderer.toneMapping=THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure=1.15;
+    container.innerHTML='';
+    container.appendChild(renderer.domElement);
+
+    // ---- lights ----
+    scene.add(new THREE.AmbientLight(0xffffff,0.35));
+    const key=new THREE.DirectionalLight(0xffffff,1.5);
+    key.position.set(6,10,8);
+    key.castShadow=true;
+    key.shadow.mapSize.set(2048,2048);
+    key.shadow.camera.near=0.5;key.shadow.camera.far=30;
+    key.shadow.camera.left=-8;key.shadow.camera.right=8;
+    key.shadow.camera.top=8;key.shadow.camera.bottom=-8;
+    key.shadow.bias=-0.0005;
+    scene.add(key);
+    const fill=new THREE.DirectionalLight(0x6699ff,0.25);
+    fill.position.set(-6,2,-4);scene.add(fill);
+    const rim=new THREE.PointLight(0x00d4aa,0.7,25);
+    rim.position.set(-4,-1,5);scene.add(rim);
+
+    // ---- controls ----
+    controls=new OrbitControls(camera,renderer.domElement);
+    controls.enableDamping=true;
+    controls.dampingFactor=0.08;
+    controls.minDistance=5;
+    controls.maxDistance=18;
+    controls.autoRotate=true;
+    controls.autoRotateSpeed=1.2;
+    controls.addEventListener('start',()=>{controls.autoRotate=false;});
+
+    createSpool();
+
+    // ---- ground shadow ----
+    const pGeo=new THREE.PlaneGeometry(30,30);
+    const pMat=new THREE.ShadowMaterial({opacity:0.35});
+    const plane=new THREE.Mesh(pGeo,pMat);
+    plane.rotation.x=-Math.PI/2;
+    plane.position.y=-3.2;
+    plane.receiveShadow=true;
+    scene.add(plane);
+
+    window.Spool3D={ready:true,update};
+    if(typeof updatePelletPreview==='function')updatePelletPreview();
+
+    animate();
+    window.addEventListener('resize',onResize);
+  }
+
+  function createSpool(){
+    group=new THREE.Group();
+    group.rotation.x=-0.08;
+
+    // ---- texture ----
+    texCanvas=document.createElement('canvas');
+    texCanvas.width=1024;
+    texCanvas.height=512;
+    texCtx=texCanvas.getContext('2d');
+    bodyTex=new THREE.CanvasTexture(texCanvas);
+    bodyTex.wrapS=THREE.RepeatWrapping;
+    bodyTex.wrapT=THREE.RepeatWrapping;
+    bodyTex.anisotropy=8;
+
+    // ---- materials ----
+    const flangeMat=new THREE.MeshStandardMaterial({color:0x222529,metalness:0.65,roughness:0.4});
+    const flangeGeo=new THREE.CylinderGeometry(3,3,0.2,72);
+
+    // left flange
+    const fL=new THREE.Mesh(flangeGeo,flangeMat);
+    fL.rotation.z=Math.PI/2;fL.position.x=-2.05;
+    fL.castShadow=true;fL.receiveShadow=true;
+    group.add(fL);
+
+    // right flange
+    const fR=new THREE.Mesh(flangeGeo,flangeMat);
+    fR.rotation.z=Math.PI/2;fR.position.x=2.05;
+    fR.castShadow=true;fR.receiveShadow=true;
+    group.add(fR);
+
+    // flange detail rings
+    for(let i=0;i<4;i++){
+      const r=2.9-i*0.45;
+      const rg=new THREE.TorusGeometry(r,0.02,6,72);
+      const rm=new THREE.MeshStandardMaterial({color:0x33373b,metalness:0.5,roughness:0.5});
+      const rL=new THREE.Mesh(rg,rm);rL.position.x=-1.95;rL.rotation.y=Math.PI/2;group.add(rL);
+      const rR=new THREE.Mesh(rg,rm.clone());rR.position.x=1.95;rR.rotation.y=Math.PI/2;group.add(rR);
+    }
+
+    // filament body
+    const bg=new THREE.CylinderGeometry(2.45,2.45,4,72,1,true);
+    const bm=new THREE.MeshStandardMaterial({map:bodyTex,metalness:0.15,roughness:0.55,side:THREE.DoubleSide});
+    bodyMesh=new THREE.Mesh(bg,bm);
+    bodyMesh.rotation.z=Math.PI/2;
+    bodyMesh.castShadow=true;bodyMesh.receiveShadow=true;
+    group.add(bodyMesh);
+
+    // end caps
+    const cg=new THREE.CircleGeometry(2.45,72);
+    const cm=new THREE.MeshStandardMaterial({color:0xffffff,metalness:0.1,roughness:0.6,side:THREE.DoubleSide});
+    capL=new THREE.Mesh(cg,cm);
+    capL.rotation.y=-Math.PI/2;capL.position.x=-2;
+    capL.receiveShadow=true;group.add(capL);
+    capR=new THREE.Mesh(cg,cm.clone());
+    capR.rotation.y=Math.PI/2;capR.position.x=2;
+    capR.receiveShadow=true;group.add(capR);
+
+    // hub
+    const hg=new THREE.CylinderGeometry(0.62,0.62,4.4,36);
+    const hm=new THREE.MeshStandardMaterial({color:0x1a1c1f,metalness:0.4,roughness:0.7});
+    const hub=new THREE.Mesh(hg,hm);
+    hub.rotation.z=Math.PI/2;hub.castShadow=true;
+    group.add(hub);
+
+    // center hole
+    const hg2=new THREE.CylinderGeometry(0.38,0.38,4.5,32);
+    const hm2=new THREE.MeshBasicMaterial({color:0x000000});
+    const hole=new THREE.Mesh(hg2,hm2);
+    hole.rotation.z=Math.PI/2;group.add(hole);
+
+    // filament strand
+    const pts=[
+      new THREE.Vector3(2.3,0,0),
+      new THREE.Vector3(3.2,0.5,0.3),
+      new THREE.Vector3(4.0,-0.3,0.8),
+      new THREE.Vector3(4.5,-1.0,1.5),
+      new THREE.Vector3(4.8,-1.8,2.2),
+    ];
+    const curve=new THREE.CatmullRomCurve3(pts);
+    const sg=new THREE.TubeGeometry(curve,40,0.07,8,false);
+    const sm=new THREE.MeshStandardMaterial({color:0xffffff,metalness:0.1,roughness:0.5});
+    strand=new THREE.Mesh(sg,sm);
+    strand.castShadow=true;group.add(strand);
+
+    // label sprite
+    const lc=document.createElement('canvas');
+    lc.width=256;lc.height=64;
+    const lx=lc.getContext('2d');
+    const lt=new THREE.CanvasTexture(lc);
+    const lm=new THREE.SpriteMaterial({map:lt,transparent:true,opacity:0.5});
+    labelSprite=new THREE.Sprite(lm);
+    labelSprite.scale.set(2.4,0.6,1);
+    labelSprite.position.set(0,0,0);
+    group.add(labelSprite);
+
+    scene.add(group);
+  }
+
+  function updateTexture(color,additives){
+    const ctx=texCtx,W=texCanvas.width,H=texCanvas.height;
+    _seed=12345; // reset for deterministic pattern
+
+    // base fill
+    ctx.fillStyle=color;
+    ctx.fillRect(0,0,W,H);
+
+    // cylindrical shading gradient
+    const grad=ctx.createLinearGradient(0,0,0,H);
+    grad.addColorStop(0,cvshade(color,0.25));
+    grad.addColorStop(0.15,cvshade(color,0.08));
+    grad.addColorStop(0.5,'rgba(255,255,255,0.05)');
+    grad.addColorStop(0.85,cvshade(color,-0.2));
+    grad.addColorStop(1,cvshade(color,-0.4));
+    ctx.fillStyle=grad;
+    ctx.fillRect(0,0,W,H);
+
+    // winding lines
+    ctx.strokeStyle=cvshade(color,-0.5);
+    ctx.lineWidth=1.5;
+    ctx.globalAlpha=0.12;
+    for(let i=0;i<90;i++){
+      const y=(i/90)*H;
+      ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();
+    }
+    ctx.globalAlpha=1;
+
+    // additive speckles
+    const keys=Object.keys(additives||{});
+    keys.forEach(key=>{
+      const pct=additives[key];
+      if(!pct)return;
+      const density=Math.min(1,pct/3);
+      const count=Math.round(250*density);
+
+      if(key==='carbonBlack'){
+        ctx.fillStyle=`rgba(0,0,0,${density*0.22})`;
+        ctx.fillRect(0,0,W,H);
+        return;
+      }
+
+      for(let i=0;i<count;i++){
+        const x=rnd()*W,y=rnd()*H,r=2+rnd()*2;
+        switch(key){
+          case'carbonFiber':
+            ctx.save();ctx.translate(x,y);ctx.rotate(rnd()*Math.PI);
+            ctx.fillStyle='rgba(15,15,15,0.85)';
+            ctx.fillRect(-r*1.5,-0.6,r*3,1.2);ctx.restore();break;
+          case'coffeeGrounds':
+            ctx.fillStyle=`rgba(61,26,10,${0.7+rnd()*0.2})`;
+            ctx.beginPath();ctx.arc(x,y,r*0.7,0,Math.PI*2);ctx.fill();break;
+          case'metalPowder':
+            ctx.fillStyle=rnd()>0.5?'rgba(192,192,192,0.85)':'rgba(168,168,168,0.8)';
+            ctx.beginPath();ctx.arc(x,y,r*0.9,0,Math.PI*2);ctx.fill();
+            ctx.fillStyle='rgba(232,232,232,0.6)';
+            ctx.beginPath();ctx.arc(x-r*0.3,y-r*0.3,r*0.35,0,Math.PI*2);ctx.fill();break;
+          case'woodFill':
+            ctx.save();ctx.translate(x,y);ctx.rotate(rnd()*Math.PI);
+            ctx.fillStyle='rgba(107,52,16,0.7)';
+            ctx.fillRect(-r,-0.4,r*2,0.8);ctx.restore();break;
+          case'glowPowder':
+            ctx.fillStyle='rgba(0,255,136,0.45)';
+            ctx.beginPath();ctx.arc(x,y,r*1.6,0,Math.PI*2);ctx.fill();
+            ctx.fillStyle='rgba(170,255,204,0.9)';
+            ctx.beginPath();ctx.arc(x,y,r*0.6,0,Math.PI*2);ctx.fill();break;
+          case'fluorescent':
+            ctx.fillStyle='rgba(255,255,68,0.5)';
+            ctx.beginPath();ctx.arc(x,y,r*1.2,0,Math.PI*2);ctx.fill();break;
+          case'glassFiber':
+            ctx.save();ctx.translate(x,y);ctx.rotate(rnd()*Math.PI);
+            ctx.fillStyle='rgba(176,208,232,0.4)';
+            ctx.fillRect(-r,-0.3,r*2,0.6);ctx.restore();break;
+        }
+      }
+    });
+
+    bodyTex.needsUpdate=true;
+  }
+
+  function update(color,additives,matName){
+    if(!bodyMesh)return;
+    const c=new THREE.Color(color);
+    updateTexture(color,additives);
+    capL.material.color=c;
+    capR.material.color=c;
+    strand.material.color=c;
+
+    // update label
+    if(labelSprite&&matName){
+      const lc=labelSprite.material.map.image;
+      const lx=lc.getContext('2d');
+      lx.clearRect(0,0,256,64);
+      lx.fillStyle='rgba(255,255,255,0.12)';
+      lx.font='bold 22px -apple-system,sans-serif';
+      lx.textAlign='center';lx.textBaseline='middle';
+      lx.fillText(matName,128,32);
+      labelSprite.material.map.needsUpdate=true;
+    }
+  }
+
+  function onResize(){
+    if(!renderer)return;
+    const w=container.clientWidth||280,h=280;
+    camera.aspect=w/h;camera.updateProjectionMatrix();
+    renderer.setSize(w,h);
+  }
+
+  function animate(){
+    requestAnimationFrame(animate);
+    controls.update();
+    renderer.render(scene,camera);
+  }
+
+  init();
+})();
 </script>
 </body>
 </html>
