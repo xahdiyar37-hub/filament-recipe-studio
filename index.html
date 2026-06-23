@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>FilaForge — 颗粒制线配方工作站</title>
+<title>Filashop — 颗粒制线配方工作站</title>
 <style>
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
 :root{
@@ -308,7 +308,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',Ro
   <div class="topbar">
     <div class="topbar-brand">
       <div class="dot"></div>
-      <span>FilaForge</span>
+      <span>Filashop</span>
       <span class="topbar-sub" data-i18n="subtitle">颗粒制线配方工作站</span>
     </div>
     <div class="topbar-actions">
@@ -781,7 +781,7 @@ const LANG = {
     additiveCountStr:(n)=>`+${n} additive`,
   }
 };
-let currentLang = localStorage.getItem('filaforge_lang') || 'zh';
+let currentLang = localStorage.getItem('filashop_lang') || 'zh';
 function t(key,...args){
   const v=LANG[currentLang]?.[key];
   if(typeof v==='function') return v(...args);
@@ -789,12 +789,12 @@ function t(key,...args){
 }
 function toggleLang(){
   currentLang = currentLang==='zh'?'en':'zh';
-  localStorage.setItem('filaforge_lang',currentLang);
+  localStorage.setItem('filashop_lang',currentLang);
   applyLanguage();
 }
 function applyLanguage(){
   document.documentElement.lang = currentLang==='zh'?'zh-CN':'en';
-  document.title = currentLang==='zh'?'FilaForge — 颗粒制线配方工作站':'FilaForge — Filament Recipe Studio';
+  document.title = currentLang==='zh'?'Filashop — 颗粒制线配方工作站':'Filashop — Filament Recipe Studio';
   // Update lang toggle button
   const btn=document.getElementById('langToggle');
   if(btn) btn.textContent = currentLang==='zh'?'EN':'中文';
@@ -941,7 +941,7 @@ function clearDirty(){
 function init(){
   // Set initial language
   document.documentElement.lang = currentLang==='zh'?'zh-CN':'en';
-  document.title = currentLang==='zh'?'FilaForge — 颗粒制线配方工作站':'FilaForge — Filament Recipe Studio';
+  document.title = currentLang==='zh'?'Filashop — 颗粒制线配方工作站':'Filashop — Filament Recipe Studio';
   const langBtn=document.getElementById('langToggle');
   if(langBtn) langBtn.textContent = currentLang==='zh'?'EN':'中文';
 
@@ -1577,8 +1577,8 @@ function updateSummary(){
 }
 
 // ===== Recipe Library =====
-function getUserRecipes(){try{return JSON.parse(localStorage.getItem('filaforge_recipes')||'{}')}catch(e){return{}}}
-function saveUserRecipes(o){try{localStorage.setItem('filaforge_recipes',JSON.stringify(o))}catch(e){}}
+function getUserRecipes(){try{return JSON.parse(localStorage.getItem('filashop_recipes')||'{}')}catch(e){return{}}}
+function saveUserRecipes(o){try{localStorage.setItem('filashop_recipes',JSON.stringify(o))}catch(e){}}
 
 function loadRecipeSelect(){
   const sel=document.getElementById('recipeSelect');
@@ -1697,7 +1697,7 @@ function buildJSON(){
 
 function buildText(){
   const m=MATERIALS[state.material];
-  let txt=`╔═══════════════════════════╗\n║    FilaForge ${t('recipeCard')}      ║\n╚═══════════════════════════╝\n\n`;
+  let txt=`╔═══════════════════════════╗\n║    Filashop ${t('recipeCard')}      ║\n╚═══════════════════════════╝\n\n`;
   txt+=`  ${t('material')}:     ${matName(state.material)}`;
   if(state.blend) txt+=` + ${matName(state.blend)} (${state.blendPct}/${100-state.blendPct})`;
   txt+=`\n  ${t('colorLabel')}:     `;
@@ -1738,7 +1738,7 @@ function downloadExport(){
   const blob=new Blob([exportContent],{type:'application/json'});
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');
-  a.href=url;a.download='filaforge-recipe-'+Date.now()+'.json';a.click();
+  a.href=url;a.download='filashop-recipe-'+Date.now()+'.json';a.click();
   URL.revokeObjectURL(url);
   showToast(t('fileDownloaded'),'success');
 }
